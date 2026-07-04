@@ -2,6 +2,11 @@ import type { GateProvider } from "./gate";
 
 export interface OAuthIdentifyInput {
   accessToken: string;
+  /**
+   * The token endpoint's full parsed response — for extras like id_token
+   * (OIDC IdPs), granted scope, or refresh_token. Shape is IdP-specific.
+   */
+  tokenResponse: unknown;
 }
 
 export interface OAuthProviderConfig<Data extends {}> {
@@ -47,7 +52,11 @@ export function oauthProvider<Data extends {}>(
     async identify({ code, redirectUri }) {
       const res = await fetch(config.tokenEndpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          // some IdPs (GitHub) answer form-urlencoded unless asked for JSON
+          Accept: "application/json",
+        },
         body: new URLSearchParams({
           grant_type: "authorization_code",
           code,
@@ -68,7 +77,10 @@ export function oauthProvider<Data extends {}>(
         return null;
       }
 
-      return config.identify({ accessToken: data.access_token });
+      return config.identify({
+        accessToken: data.access_token,
+        tokenResponse: data,
+      });
     },
   };
 }

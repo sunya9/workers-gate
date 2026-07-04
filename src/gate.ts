@@ -49,8 +49,12 @@ export interface GateConfig<Data extends {} = {}> {
   /**
    * Custom 403 response for visitors the provider couldn't identify or the
    * filter rejected. Default: a minimal built-in HTML page.
+   * loginUrl carries the returnTo, so a retry lands on the original page.
    */
-  denied?: (context: GateFilterContext) => Response | Promise<Response>;
+  denied?: (context: {
+    request: Request;
+    loginUrl: string;
+  }) => Response | Promise<Response>;
   /**
    * Custom response for non-document requests (fetch/XHR) without a valid
    * session. Default: a plain-text 401. loginUrl carries the returnTo.
@@ -106,12 +110,12 @@ function randomState(): string {
   return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function forbiddenHtml(loginPath: string): string {
+function forbiddenHtml(loginUrl: string): string {
   return `<!doctype html>
 <meta charset="utf-8">
 <title>403 Forbidden</title>
 <p>You are not authorized to access this application.</p>
-<p><a href="${loginPath}">Sign in again</a></p>`;
+<p><a href="${loginUrl}">Sign in again</a></p>`;
 }
 
 function isSessionPayload(value: unknown): value is SessionPayload {
@@ -215,8 +219,11 @@ export function createGate<Data extends {}>(config: GateConfig<Data>): Gate {
       const allowed =
         data != null && (filter ? await filter(data, { request }) : true);
       if (!allowed) {
-        if (denied) return denied({ request });
-        return new Response(forbiddenHtml(loginPath), {
+        const retryUrl = `${loginPath}?returnTo=${encodeURIComponent(
+          safeReturnTo(statePayload.returnTo),
+        )}`;
+        if (denied) return denied({ request, loginUrl: retryUrl });
+        return new Response(forbiddenHtml(retryUrl), {
           status: 403,
           headers: { "Content-Type": "text/html; charset=utf-8" },
         });

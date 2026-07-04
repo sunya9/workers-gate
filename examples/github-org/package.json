@@ -1,0 +1,18 @@
+{
+  "name": "github-org-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "prepare:dev-vars": "test -f .dev.vars || cp .dev.vars.example .dev.vars",
+    "typecheck": "pnpm prepare:dev-vars && wrangler types && tsc --noEmit"
+  },
+  "dependencies": {
+    "workers-gate": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "wrangler": "^4.48.0"
+  }
+}

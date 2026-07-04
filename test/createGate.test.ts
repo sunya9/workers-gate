@@ -299,6 +299,18 @@ describe("custom responses", () => {
     expect(await res!.text()).toBe("no entry: /auth/callback");
   });
 
+  it("hands the denied hook a loginUrl that preserves returnTo", async () => {
+    const res = await makeGate({
+      filter: () => false,
+      denied: ({ loginUrl }) => new Response(loginUrl, { status: 403 }),
+    })(
+      docRequest("/auth/callback?code=good&state=st1", {
+        Cookie: await stateCookie("st1", "/secret"),
+      }),
+    );
+    expect(await res!.text()).toBe("/auth/login?returnTo=%2Fsecret");
+  });
+
   it("uses the denied hook when the provider cannot identify", async () => {
     const res = await makeGate({
       denied: () => new Response("who are you", { status: 403 }),

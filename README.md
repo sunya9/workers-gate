@@ -120,7 +120,7 @@ const myProvider: GateProvider<MyData> = {
 The library ships no IdP presets — endpoints, scope, and policy are yours.
 
 - **Discord, guild members only**: the Usage example above; a complete deployable project lives in [`examples/discord-guild/`](./examples/discord-guild/) (wrangler config, `.dev.vars` template, `wrangler types`-generated typing). `GET /users/@me/guilds/{GUILD_ID}/member` (scope `guilds.members.read`) asks about one guild directly — no pagination concerns, and the response carries `roles` for role-based filters. Prefer the broader `guilds` scope + `GET /users/@me/guilds` if you'd rather not let the app read your nickname/roles in that guild.
-- **GitHub, org members only**: same shape — endpoints `https://github.com/login/oauth/{authorize,access_token}`, scope `read:org`, `identify` fetches `GET /user/memberships/orgs/{org}`, filter checks `state === "active"`.
+- **GitHub, org members only**: a complete deployable project in [`examples/github-org/`](./examples/github-org/) — scope `read:org`, `identify` fetches `GET /user/memberships/orgs/{org}`, and the filter admits only `state === "active"` (this one demonstrates the filter style, where the Discord example folds the judgment into `identify`).
 - **Google Workspace, domain members only**: OIDC — implement `GateProvider` with [openid-client](https://github.com/panva/openid-client), return the ID-token claims from `identify`, and `filter: (claims) => claims.hd === "example.com"`.
 
 ## GateConfig
@@ -130,7 +130,7 @@ The library ships no IdP presets — endpoints, scope, and policy are yours.
 | `cookieSecret` | required | HMAC key for session/state cookies |
 | `provider` | required | Data procurement: `authorizeUrl` + `identify` |
 | `filter` | admit all identified | The authorization decision |
-| `denied` | built-in minimal 403 page | Custom Response for rejected/unidentified visitors |
+| `denied` | built-in minimal 403 page | Custom Response for rejected/unidentified visitors; receives `loginUrl` |
 | `unauthorized` | plain-text 401 | Custom Response for sessionless fetch/XHR; receives `loginUrl` |
 | `signin` | redirect straight to the IdP | Custom sign-in screen for unauthenticated document requests; receives `loginUrl` |
 | `sessionTtlSeconds` | `86400` | Session cookie lifetime |

@@ -66,12 +66,39 @@ describe("oauthProvider", () => {
     ];
     expect(url).toBe("https://idp.example/oauth/token");
     expect(init.method).toBe("POST");
+    // GitHub-style token endpoints answer form-urlencoded without this
+    expect((init.headers as Record<string, string>).Accept).toBe(
+      "application/json",
+    );
     const body = new URLSearchParams(init.body as string);
     expect(body.get("grant_type")).toBe("authorization_code");
     expect(body.get("code")).toBe("c1");
     expect(body.get("client_id")).toBe("my-client");
     expect(body.get("client_secret")).toBe("my-secret");
     expect(body.get("redirect_uri")).toBe("https://app.example/auth/callback");
+  });
+
+  it("hands identify the whole token response for id_token-style extras", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({ access_token: "tok", id_token: "jwt-here", scope: "s" }),
+      ),
+    );
+    const provider = oauthProvider({
+      authorizeEndpoint: "https://idp.example/oauth/authorize",
+      tokenEndpoint: "https://idp.example/oauth/token",
+      clientId: "my-client",
+      clientSecret: "my-secret",
+      identify: async ({ tokenResponse }) => ({ raw: tokenResponse }),
+    });
+    const data = await provider.identify({
+      code: "c1",
+      redirectUri: "https://app.example/auth/callback",
+    });
+    expect(data).toEqual({
+      raw: { access_token: "tok", id_token: "jwt-here", scope: "s" },
+    });
   });
 
   it("returns null when the token exchange fails", async () => {
