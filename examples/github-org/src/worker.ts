@@ -3,7 +3,6 @@ import { createGate, oauthProvider } from "workers-gate";
 import { denied } from "./denied";
 import { signin } from "./signin";
 
-// createGate does no I/O — safe to build once at isolate startup.
 const gate = createGate({
   cookieSecret: env.COOKIE_SECRET,
   provider: oauthProvider({
