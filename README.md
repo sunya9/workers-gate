@@ -158,7 +158,34 @@ By default there is no login screen at all: unauthenticated visitors are redirec
 
 - `not_found_handling: "single-page-application"` keeps client-side routing working: unknown paths serve the (gated) `index.html`.
 - Using `@cloudflare/vite-plugin`? Same worker entry, same wrangler config — `vite dev` runs the gate locally. Put the bindings in `.dev.vars` and register the localhost callback URL with your IdP.
-- When the session expires mid-visit, background `fetch` calls get `401` instead of a redirect. Handle it with a `location.reload()` — the reload goes through silent re-authorization and comes back seamlessly.
+- When the session expires mid-visit, background `fetch` calls get `401` instead of a redirect (shape the body with the `unauthorized` hook). The simple recovery is `location.reload()` — the reload goes through silent re-authorization and comes back to the same URL.
+- To renew without losing app state, use a popup: top-level navigation carries the `SameSite=Lax` cookies, which hidden iframes and background fetches do not. Serve a self-closing page behind the gate and point the popup's `returnTo` at it:
+
+```ts
+// worker: after the gate has passed
+if (url.pathname === "/auth/done") {
+  return new Response("<script>window.close()</script>", {
+    headers: { "Content-Type": "text/html" },
+  });
+}
+```
+
+```ts
+// SPA: on 401 — tie this to a click so popup blockers stay calm
+const popup = window.open(
+  "/auth/login?returnTo=%2Fauth%2Fdone&silent=1",
+  "_blank",
+  "width=520,height=640",
+);
+await new Promise<void>((resolve) => {
+  const timer = setInterval(() => {
+    if (popup?.closed) { clearInterval(timer); resolve(); }
+  }, 300);
+});
+// retry the failed request — app state untouched
+```
+
+If the silent pass fails (signed out of the IdP), the gate falls back to an interactive login inside the popup; the app keeps running either way.
 
 ## Limitations
 
