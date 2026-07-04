@@ -1,0 +1,158 @@
+# workers-gate
+
+A **stateless authorization gate** for apps on Cloudflare Workers. Bring your own provider; call the gate where you want it.
+
+Authorization, not authentication: it never asks or stores who the user is. No database, no KV, and a **single dependency**: cookie signing and verification are delegated to [jose](https://github.com/panva/jose). All that travels is a signed, expiring JWT cookie. Your filter says yes? You're in. Otherwise 403.
+
+## How it works
+
+`createGate(config)` gives you a plain function: `(request) => Promise<Response | null>`.
+
+```
+gate(request):
+  /auth/login    → Response: redirect to provider.authorizeUrl(...)
+  /auth/callback → provider.identify(...) fetches data → your filter(data) decides
+                   ├─ true  → Response: signed session cookie + redirect back
+                   └─ false → Response: 403
+  anything else  → valid session cookie? (signature + expiry, no I/O)
+                   ├─ yes → null   ← the request is yours
+                   └─ no  → Response: redirect to login (or 401 for non-document requests)
+```
+
+You call it inside your own `fetch` and return early when it hands you a Response — the standard middleware contract. No wrapping, no hidden routing, no implicit env reads: every value the gate uses is one you passed it.
+
+## Usage
+
+`createGate` does no I/O at construction, so build the gate once at module scope with the [`cloudflare:workers`](https://developers.cloudflare.com/workers/runtime-apis/bindings/#importing-env-as-a-module) env import (compatibility date 2025-03-10+):
+
+```ts
+// src/worker.ts — a gated static site, in full
+import { env } from "cloudflare:workers";
+import { createGate, oauthProvider } from "workers-gate";
+
+const gate = createGate({
+  cookieSecret: env.COOKIE_SECRET,
+  provider: oauthProvider({
+    authorizeEndpoint: "https://discord.com/oauth2/authorize",
+    tokenEndpoint: "https://discord.com/api/v10/oauth2/token",
+    clientId: env.DISCORD_CLIENT_ID,
+    clientSecret: env.DISCORD_CLIENT_SECRET,
+    scope: "guilds.members.read",
+    silentParams: { prompt: "none" },
+    async identify({ accessToken }) {
+      // membership in this one guild, straight from Discord; 404 = not a member
+      const res = await fetch(
+        `https://discord.com/api/v10/users/@me/guilds/${env.GUILD_ID}/member`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      if (!res.ok) return null;
+      const member: { roles: string[] } = await res.json();
+      return member;
+    },
+  }),
+  // membership itself is the policy; add a filter for finer rules, e.g. roles:
+  // filter: (member) => member.roles.includes("your-role-id"),
+});
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const denied = await gate(request);
+    if (denied) return denied;
+
+    return env.ASSETS.fetch(request); // ← authorized; from here the request is yours
+  },
+};
+```
+
+On older compatibility dates (or if you prefer keeping the module portable), build the gate inside `fetch` from the handler's `env` argument instead — construction is just a closure, so per-request creation costs nothing.
+
+- `filter` receives whatever data `identify` returned — fully typed, re-evaluated on every (re-)login. Omit it to admit anyone the provider can identify.
+- The layering encodes ownership: `identify` lives in the provider (shareable, policy-free procurement), `filter` lives in your config (your deployment's policy). Folding the judgment into `identify` (return `null` for "no") is equally valid if you prefer one spot — `filter` exists so shared providers stay reusable.
+- Want public routes? Just don't consult the gate for them: `if (url.pathname === "/healthz") return ok()` before calling `gate(request)`.
+- Works with wrangler-generated `Env` types as-is — the gate never touches `env`; you hand it values.
+
+Route every request through the worker so static assets are gated too:
+
+```jsonc
+// wrangler.jsonc
+{
+  "main": "src/worker.ts",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application", // for SPAs
+    "run_worker_first": true // or ["/*", "!/assets/*"] to skip hashed assets
+  }
+}
+```
+
+Bindings in the example: `COOKIE_SECRET` (`openssl rand -hex 32`, via `wrangler secret put`), plus whatever your provider and filter read — that part is your design, not the library's.
+
+## Providers
+
+For any vanilla OAuth2 authorization-code IdP, `oauthProvider()` covers the protocol plumbing — two endpoints, client credentials, and an `identify()` that fetches the data your filter judges.
+
+For IdPs with heavier dialects (PKCE-required, custom token-endpoint auth), implement `GateProvider` directly — two functions — on top of whatever client you like ([openid-client](https://github.com/panva/openid-client) for OIDC, [Arctic](https://arcticjs.dev) for 60+ providers; both run on Workers):
+
+```ts
+import { type GateProvider } from "workers-gate";
+
+const myProvider: GateProvider<MyData> = {
+  // Where visitors go to prove themselves.
+  authorizeUrl({ redirectUri, state, silent }) {
+    return "https://idp.example/authorize?...";
+  },
+  // Procure the data about the visitor. null = could not identify.
+  async identify({ code, redirectUri }) {
+    return { /* whatever your filter needs */ };
+  },
+};
+```
+
+**The contract:** `authorizeUrl` must request whatever scope/claims `identify` needs to gather its data — the two are a pair. Keep the scope minimal: request only what the filter's decision requires.
+
+`silent` is `true` when a returning visitor's session just expired; OAuth-style providers can translate it to `prompt=none`. If the IdP answers the callback with an `error` param, the gate automatically retries an interactive login.
+
+## Recipes
+
+The library ships no IdP presets — endpoints, scope, and policy are yours.
+
+- **Discord, guild members only**: the Usage example above; a complete deployable project lives in [`examples/discord-guild/`](./examples/discord-guild/) (wrangler config, `.dev.vars` template, `wrangler types`-generated typing). `GET /users/@me/guilds/{GUILD_ID}/member` (scope `guilds.members.read`) asks about one guild directly — no pagination concerns, and the response carries `roles` for role-based filters. Prefer the broader `guilds` scope + `GET /users/@me/guilds` if you'd rather not let the app read your nickname/roles in that guild.
+- **GitHub, org members only**: same shape — endpoints `https://github.com/login/oauth/{authorize,access_token}`, scope `read:org`, `identify` fetches `GET /user/memberships/orgs/{org}`, filter checks `state === "active"`.
+- **Google Workspace, domain members only**: OIDC — implement `GateProvider` with [openid-client](https://github.com/panva/openid-client), return the ID-token claims from `identify`, and `filter: (claims) => claims.hd === "example.com"`.
+
+## GateConfig
+
+| Field | Default | Description |
+|---|---|---|
+| `cookieSecret` | required | HMAC key for session/state cookies |
+| `provider` | required | Data procurement: `authorizeUrl` + `identify` |
+| `filter` | admit all identified | The authorization decision |
+| `denied` | built-in minimal 403 page | Custom Response for rejected/unidentified visitors |
+| `unauthorized` | plain-text 401 | Custom Response for sessionless fetch/XHR; receives `loginUrl` |
+| `signin` | redirect straight to the IdP | Custom sign-in screen for unauthenticated document requests; receives `loginUrl` |
+| `sessionTtlSeconds` | `86400` | Session cookie lifetime |
+| `loginPath` / `callbackPath` / `logoutPath` | `/auth/login` `/auth/callback` `/auth/logout` | Routes the gate claims |
+| `cookieName` / `stateCookieName` | `__gate` `__gate_state` | Cookie names |
+
+## Screens are yours
+
+The gate ships no UI beyond a fallback 403/401. Every visible surface is replaceable:
+
+- **Sign-in screen** (`signin`): rendered in place of the default straight-to-IdP redirect for unauthenticated page visits — the URL stays put, your screen shows, its button points at `loginUrl` (which already carries the `returnTo`). The [`examples/discord-guild/`](./examples/discord-guild/) worker renders a styled "Continue with Discord" page this way. Silent re-authorization of expired sessions bypasses the screen and stays seamless.
+- **Denied page** (`denied`): `denied: () => new Response(myBrandedHtml, { status: 403, headers: { "Content-Type": "text/html" } })`
+- **API 401 shape** (`unauthorized`): `unauthorized: ({ loginUrl }) => Response.json({ error: "login required", loginUrl }, { status: 401 })`
+
+By default there is no login screen at all: unauthenticated visitors are redirected straight to the IdP's own consent page.
+
+## Notes for SPAs
+
+- `not_found_handling: "single-page-application"` keeps client-side routing working: unknown paths serve the (gated) `index.html`.
+- Using `@cloudflare/vite-plugin`? Same worker entry, same wrangler config — `vite dev` runs the gate locally. Put the bindings in `.dev.vars` and register the localhost callback URL with your IdP.
+- When the session expires mid-visit, background `fetch` calls get `401` instead of a redirect. Handle it with a `location.reload()` — the reload goes through silent re-authorization and comes back seamlessly.
+
+## Limitations
+
+- **Stateless means no early revocation**: a visitor who no longer satisfies your policy keeps access until their cookie expires (default 24h). Shorten `sessionTtlSeconds` if that matters.
+- Scope is redirect-and-callback flows (OAuth/OIDC-style). Basic auth or IP allowlists are a different animal.
+- A `POST` issued with an expired session is redirected and loses its body — the follow-up navigation re-authorizes.

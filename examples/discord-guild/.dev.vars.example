@@ -1,0 +1,10 @@
+# Copy me: `cp .dev.vars.example .dev.vars`, then fill in your Discord app's
+# credentials. `.dev.vars` is gitignored; `wrangler types` reads it to type
+# the secrets on env.
+DISCORD_CLIENT_ID = "replace-me"
+DISCORD_CLIENT_SECRET = "replace-me"
+COOKIE_SECRET = "replace-me-with-openssl-rand-hex-32"
+
+# Optional: values here override wrangler.jsonc "vars" during `wrangler dev`,
+# so you can test against a real guild without touching tracked files.
+# GUILD_ID = "your-real-guild-id"
