@@ -88,6 +88,8 @@ Route every request through the worker so static assets are gated too:
 
 Bindings in the example: `COOKIE_SECRET` (`openssl rand -hex 32`, via `wrangler secret put`), plus whatever your provider and filter read — that part is your design, not the library's.
 
+**Set secrets before the first deploy.** `createGate` fails fast on an empty `cookieSecret`, so a worker deployed without its secrets won't even pass deploy validation. `wrangler secret put` offers to create a draft Worker when none exists — put the secrets first, then deploy. To keep deployment-specific values out of tracked files, `wrangler deploy --var GUILD_ID:...` overrides config vars at deploy time.
+
 ## Providers
 
 For any vanilla OAuth2 authorization-code IdP, `oauthProvider()` covers the protocol plumbing — two endpoints, client credentials, and an `identify()` that fetches the data your filter judges.
