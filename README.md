@@ -142,7 +142,7 @@ OIDC — implement `GateProvider` with openid-client, return the ID-token claims
 
 | Field                                       | Default                                       | Description                                                                      |
 | ------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------- |
-| `cookieSecret`                              | required                                      | HMAC key for session/state cookies                                               |
+| `cookieSecret`                              | required                                      | HMAC key for session/state cookies, 32+ characters                               |
 | `provider`                                  | required                                      | Data procurement: `authorizeUrl` + `identify`                                    |
 | `filter`                                    | admit all identified                          | The authorization decision                                                       |
 | `signin`                                    | redirect straight to the IdP                  | Custom sign-in screen for unauthenticated document requests; receives `loginUrl` |
@@ -151,6 +151,15 @@ OIDC — implement `GateProvider` with openid-client, return the ID-token claims
 | `sessionTtlSeconds`                         | `86400`                                       | Session cookie lifetime                                                          |
 | `loginPath` / `callbackPath` / `logoutPath` | `/auth/login` `/auth/callback` `/auth/logout` | Routes the gate claims                                                           |
 | `cookieName` / `stateCookieName`            | `__gate` `__gate_state`                       | Cookie names                                                                     |
+| `sessionVersion`                            | unset                                         | Bump to send every outstanding session back through re-authorization             |
+
+## Security notes
+
+- Sessions are bound to the request origin via the JWT `aud` claim: a cookie minted on one hostname does not pass on another, and reusing a `cookieSecret` across apps no longer lets their sessions cross.
+- `createGate` rejects a `cookieSecret` shorter than 32 characters.
+- `sessionVersion` is the stateless revocation lever: bumping it invalidates every session at once, and holders are silently re-authorized — which re-runs `identify` and your `filter`.
+- Exceptions from `identify`/`filter` and malformed token-endpoint responses fail closed to the denied response; the cause is logged via `console.error` (visible in `wrangler tail`).
+- For cookie-tossing resistance, set `cookieName: "__Host-gate"` and `stateCookieName: "__Host-gate_state"` — the attributes already qualify, and the state cookie path widens to `/` automatically. Heads-up: some browsers drop `__Host-` cookies on plain-HTTP localhost during `wrangler dev`.
 
 ## Screens are yours
 
@@ -200,6 +209,6 @@ If the silent pass fails (signed out of the IdP), the gate falls back to an inte
 
 ## Limitations
 
-- Stateless means no early revocation: a visitor who no longer satisfies your policy keeps access until their cookie expires (default 24h). Shorten `sessionTtlSeconds` if that matters.
+- Stateless means no per-visitor revocation: someone who no longer satisfies your policy keeps access until their cookie expires (default 24h). Shorten `sessionTtlSeconds`, or bump `sessionVersion` to cut off everyone at once.
 - Scope is redirect-and-callback flows (OAuth/OIDC-style). Basic auth or IP allowlists are a different animal.
 - A `POST` issued with an expired session is redirected and loses its body — the follow-up navigation re-authorizes.
