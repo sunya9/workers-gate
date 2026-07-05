@@ -1,6 +1,6 @@
 {
   "name": "workers-gate",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Stateless authorization gate for apps on Cloudflare Workers — bring your own provider, no database, cookie signing delegated to jose",
   "keywords": [
     "authorization",
