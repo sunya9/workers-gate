@@ -1,5 +1,9 @@
 # workers-gate
 
+[![npm](https://img.shields.io/npm/v/workers-gate)](https://www.npmjs.com/package/workers-gate)
+[![CI](https://github.com/sunya9/workers-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/sunya9/workers-gate/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/workers-gate)](./LICENSE)
+
 A stateless authorization gate for apps on Cloudflare Workers. Bring your own provider; call the gate where you want it.
 
 Authorization, not authentication: it never asks or stores who the user is. No database, no KV, and a single dependency — cookie signing and verification are delegated to [jose](https://github.com/panva/jose). All that travels is a signed, expiring JWT cookie. Your filter says yes? You're in. Otherwise 403.
