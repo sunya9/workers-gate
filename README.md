@@ -60,8 +60,8 @@ Route every request through the worker so static assets are gated too:
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application", // for SPAs
-    "run_worker_first": true // or ["/*", "!/assets/*"] to skip hashed assets
-  }
+    "run_worker_first": true, // or ["/*", "!/assets/*"] to skip hashed assets
+  },
 }
 ```
 
@@ -85,7 +85,9 @@ const myProvider: GateProvider<MyData> = {
   },
   // Procure the data about the visitor. null = could not identify.
   async identify({ code, redirectUri }) {
-    return { /* whatever your filter needs */ };
+    return {
+      /* whatever your filter needs */
+    };
   },
 };
 ```
@@ -134,17 +136,17 @@ OIDC — implement `GateProvider` with openid-client, return the ID-token claims
 
 ## GateConfig
 
-| Field | Default | Description |
-|---|---|---|
-| `cookieSecret` | required | HMAC key for session/state cookies |
-| `provider` | required | Data procurement: `authorizeUrl` + `identify` |
-| `filter` | admit all identified | The authorization decision |
-| `signin` | redirect straight to the IdP | Custom sign-in screen for unauthenticated document requests; receives `loginUrl` |
-| `denied` | built-in minimal 403 page | Custom Response for rejected/unidentified visitors; receives `loginUrl` |
-| `unauthorized` | plain-text 401 | Custom Response for sessionless fetch/XHR; receives `loginUrl` |
-| `sessionTtlSeconds` | `86400` | Session cookie lifetime |
-| `loginPath` / `callbackPath` / `logoutPath` | `/auth/login` `/auth/callback` `/auth/logout` | Routes the gate claims |
-| `cookieName` / `stateCookieName` | `__gate` `__gate_state` | Cookie names |
+| Field                                       | Default                                       | Description                                                                      |
+| ------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------- |
+| `cookieSecret`                              | required                                      | HMAC key for session/state cookies                                               |
+| `provider`                                  | required                                      | Data procurement: `authorizeUrl` + `identify`                                    |
+| `filter`                                    | admit all identified                          | The authorization decision                                                       |
+| `signin`                                    | redirect straight to the IdP                  | Custom sign-in screen for unauthenticated document requests; receives `loginUrl` |
+| `denied`                                    | built-in minimal 403 page                     | Custom Response for rejected/unidentified visitors; receives `loginUrl`          |
+| `unauthorized`                              | plain-text 401                                | Custom Response for sessionless fetch/XHR; receives `loginUrl`                   |
+| `sessionTtlSeconds`                         | `86400`                                       | Session cookie lifetime                                                          |
+| `loginPath` / `callbackPath` / `logoutPath` | `/auth/login` `/auth/callback` `/auth/logout` | Routes the gate claims                                                           |
+| `cookieName` / `stateCookieName`            | `__gate` `__gate_state`                       | Cookie names                                                                     |
 
 ## Screens are yours
 
@@ -181,7 +183,10 @@ const popup = window.open(
 );
 await new Promise<void>((resolve) => {
   const timer = setInterval(() => {
-    if (popup?.closed) { clearInterval(timer); resolve(); }
+    if (popup?.closed) {
+      clearInterval(timer);
+      resolve();
+    }
   }, 300);
 });
 // retry the failed request — app state untouched

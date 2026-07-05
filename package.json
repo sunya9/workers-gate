@@ -2,31 +2,31 @@
   "name": "workers-gate",
   "version": "0.0.0",
   "description": "Stateless authorization gate for apps on Cloudflare Workers — bring your own provider, no database, cookie signing delegated to jose",
-  "type": "module",
-  "license": "MIT",
   "keywords": [
-    "cloudflare-workers",
     "authorization",
-    "oauth2",
+    "cloudflare-workers",
     "gate",
+    "oauth2",
     "stateless"
   ],
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
   },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "fmt": "oxfmt src test examples",
-    "fmt:check": "oxfmt --check src test examples",
-    "lint": "oxlint src test examples",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "lint": "oxlint",
     "typecheck": "tsc --noEmit",
     "typecheck:examples": "pnpm --filter './examples/*' typecheck"
   },
