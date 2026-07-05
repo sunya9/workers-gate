@@ -145,8 +145,8 @@ export function createGate<Data extends {}>(config: GateConfig<Data>): Gate {
     callbackPath = "/auth/callback",
     logoutPath = "/auth/logout",
     sessionTtlSeconds = 60 * 60 * 24,
-    cookieName = "__gate",
-    stateCookieName = "__gate_state",
+    cookieName = "__Host-gate",
+    stateCookieName = "__Host-gate_state",
   } = config;
 
   if (cookieSecret.length < 32) {

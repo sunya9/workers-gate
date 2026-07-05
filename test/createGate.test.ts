@@ -36,7 +36,7 @@ function nowSec() {
 
 async function stateCookie(state = "st1", returnTo = "/secret") {
   const token = await sign({ state, returnTo, exp: nowSec() + 600 }, SECRET, ORIGIN);
-  return `__gate_state=${token}`;
+  return `__Host-gate_state=${token}`;
 }
 
 describe("unauthorized access", () => {
@@ -63,7 +63,7 @@ describe("login start", () => {
     expect(location.origin).toBe("https://idp.example");
     expect(location.searchParams.get("state")).toBeTruthy();
     const setCookie = res!.headers.get("Set-Cookie") ?? "";
-    expect(setCookie).toContain("__gate_state=");
+    expect(setCookie).toContain("__Host-gate_state=");
     expect(setCookie).toContain("HttpOnly");
   });
 
@@ -98,7 +98,7 @@ describe("callback", () => {
     expect(res!.status).toBe(302);
     expect(res!.headers.get("Location")).toBe("/secret");
     const setCookie = res!.headers.get("Set-Cookie") ?? "";
-    expect(setCookie).toContain("__gate=");
+    expect(setCookie).toContain("__Host-gate=");
     expect(setCookie).toContain("HttpOnly");
     expect(setCookie).toContain("Secure");
     expect(setCookie).toContain("SameSite=Lax");
@@ -205,13 +205,13 @@ describe("filter", () => {
 describe("session", () => {
   it("returns null for requests with a valid session cookie", async () => {
     const token = await sign({ exp: nowSec() + 3600 }, SECRET, ORIGIN);
-    const res = await makeGate()(docRequest("/secret", { Cookie: `__gate=${token}` }));
+    const res = await makeGate()(docRequest("/secret", { Cookie: `__Host-gate=${token}` }));
     expect(res).toBeNull();
   });
 
   it("sends expired sessions to silent re-authorization", async () => {
     const token = await sign({ exp: nowSec() - 10 }, SECRET, ORIGIN);
-    const res = await makeGate()(docRequest("/secret", { Cookie: `__gate=${token}` }));
+    const res = await makeGate()(docRequest("/secret", { Cookie: `__Host-gate=${token}` }));
     expect(res!.status).toBe(302);
     const location = new URL(res!.headers.get("Location")!, "https://app.example");
     expect(location.pathname).toBe("/auth/login");
@@ -222,7 +222,7 @@ describe("session", () => {
     const res = await makeGate()(docRequest("/auth/logout"));
     expect(res!.status).toBe(302);
     const setCookie = res!.headers.get("Set-Cookie") ?? "";
-    expect(setCookie).toContain("__gate=;");
+    expect(setCookie).toContain("__Host-gate=;");
     expect(setCookie).toContain("Max-Age=0");
   });
 });
@@ -240,7 +240,7 @@ describe("configuration", () => {
 describe("session hardening", () => {
   it("rejects session cookies issued for a different origin", async () => {
     const token = await sign({ exp: nowSec() + 3600 }, SECRET, "https://other.example");
-    const res = await makeGate()(docRequest("/secret", { Cookie: `__gate=${token}` }));
+    const res = await makeGate()(docRequest("/secret", { Cookie: `__Host-gate=${token}` }));
     expect(res!.status).toBe(302);
     const location = new URL(res!.headers.get("Location")!, ORIGIN);
     expect(location.pathname).toBe("/auth/login");
@@ -254,7 +254,7 @@ describe("session hardening", () => {
         Cookie: await stateCookie(),
       }),
     );
-    const token = (res!.headers.get("Set-Cookie") ?? "").match(/__gate=([^;]+)/)![1]!;
+    const token = (res!.headers.get("Set-Cookie") ?? "").match(/__Host-gate=([^;]+)/)![1]!;
     const verified = await verify(token, SECRET, ORIGIN);
     expect(verified).not.toBeNull();
     expect(verified!.payload).toMatchObject({ v: 3, aud: ORIGIN });
@@ -263,7 +263,7 @@ describe("session hardening", () => {
   it("admits sessions carrying the current sessionVersion", async () => {
     const token = await sign({ exp: nowSec() + 3600, v: "2024-policy" }, SECRET, ORIGIN);
     const res = await makeGate({ sessionVersion: "2024-policy" })(
-      docRequest("/secret", { Cookie: `__gate=${token}` }),
+      docRequest("/secret", { Cookie: `__Host-gate=${token}` }),
     );
     expect(res).toBeNull();
   });
@@ -271,7 +271,7 @@ describe("session hardening", () => {
   it("sends stale-version sessions back through silent re-authorization", async () => {
     const token = await sign({ exp: nowSec() + 3600, v: 1 }, SECRET, ORIGIN);
     const res = await makeGate({ sessionVersion: 2 })(
-      docRequest("/secret", { Cookie: `__gate=${token}` }),
+      docRequest("/secret", { Cookie: `__Host-gate=${token}` }),
     );
     expect(res!.status).toBe(302);
     const location = new URL(res!.headers.get("Location")!, ORIGIN);
@@ -307,12 +307,19 @@ describe("fail-closed on exceptions", () => {
 });
 
 describe("__Host- cookies", () => {
-  it("widens the state cookie path to / when the name is __Host- prefixed", async () => {
-    const res = await makeGate({ stateCookieName: "__Host-gate_state" })(docRequest("/auth/login"));
+  it("defaults to __Host- names with Path=/ so the prefix rules hold", async () => {
+    const res = await makeGate()(docRequest("/auth/login"));
     const setCookie = res!.headers.get("Set-Cookie") ?? "";
     expect(setCookie).toContain("__Host-gate_state=");
     expect(setCookie).toContain("Path=/;");
     expect(setCookie).not.toContain("Path=/auth/callback");
+  });
+
+  it("narrows the state cookie to the callback path for non-prefixed names", async () => {
+    const res = await makeGate({ stateCookieName: "plain_state" })(docRequest("/auth/login"));
+    const setCookie = res!.headers.get("Set-Cookie") ?? "";
+    expect(setCookie).toContain("plain_state=");
+    expect(setCookie).toContain("Path=/auth/callback");
   });
 });
 
@@ -334,7 +341,7 @@ describe("custom responses", () => {
     const token = await sign({ exp: nowSec() - 10 }, SECRET, ORIGIN);
     const res = await makeGate({
       signin: () => new Response("should not appear", { status: 401 }),
-    })(docRequest("/secret", { Cookie: `__gate=${token}` }));
+    })(docRequest("/secret", { Cookie: `__Host-gate=${token}` }));
     expect(res!.status).toBe(302);
     const location = new URL(res!.headers.get("Location")!, "https://app.example");
     expect(location.searchParams.get("silent")).toBe("1");

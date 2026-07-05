@@ -150,7 +150,7 @@ OIDC — implement `GateProvider` with openid-client, return the ID-token claims
 | `unauthorized`                              | plain-text 401                                | Custom Response for sessionless fetch/XHR; receives `loginUrl`                   |
 | `sessionTtlSeconds`                         | `86400`                                       | Session cookie lifetime                                                          |
 | `loginPath` / `callbackPath` / `logoutPath` | `/auth/login` `/auth/callback` `/auth/logout` | Routes the gate claims                                                           |
-| `cookieName` / `stateCookieName`            | `__gate` `__gate_state`                       | Cookie names                                                                     |
+| `cookieName` / `stateCookieName`            | `__Host-gate` `__Host-gate_state`             | Cookie names                                                                     |
 | `sessionVersion`                            | unset                                         | Bump to send every outstanding session back through re-authorization             |
 
 ## Security notes
@@ -159,7 +159,8 @@ OIDC — implement `GateProvider` with openid-client, return the ID-token claims
 - `createGate` rejects a `cookieSecret` shorter than 32 characters.
 - `sessionVersion` is the stateless revocation lever: bumping it invalidates every session at once, and holders are silently re-authorized — which re-runs `identify` and your `filter`.
 - Exceptions from `identify`/`filter` and malformed token-endpoint responses fail closed to the denied response; the cause is logged via `console.error` (visible in `wrangler tail`).
-- For cookie-tossing resistance, set `cookieName: "__Host-gate"` and `stateCookieName: "__Host-gate_state"` — the attributes already qualify, and the state cookie path widens to `/` automatically. Heads-up: some browsers drop `__Host-` cookies on plain-HTTP localhost during `wrangler dev`.
+- Cookies default to `__Host-` prefixed names for cookie-tossing resistance: no parent or sibling (sub)domain can plant or shadow them. Override with plain names only if you must; a non-prefixed `stateCookieName` also narrows the state cookie back to the callback path.
+- Local dev note: all gate cookies carry `Secure`, which Safari drops on plain-HTTP localhost — use Chrome or Firefox with `wrangler dev` (both treat localhost as trustworthy).
 
 ## Screens are yours
 
