@@ -26,12 +26,14 @@ You call it inside your own `fetch` and return early when it hands you a Respons
 ```ts
 // src/worker.ts
 import { env } from "cloudflare:workers";
-import { createGate } from "workers-gate";
-import { myProvider } from "./provider"; // see Providers & Recipes below
+import { createGate, oauthProvider } from "workers-gate";
 
 const gate = createGate({
   cookieSecret: env.COOKIE_SECRET,
-  provider: myProvider,
+  provider: oauthProvider({
+    // endpoints, client credentials, scope, identify() —
+    // see Providers below; complete configs live in Recipes
+  }),
   filter: (data) => data.team === "blue", // your policy, typed by the provider
 });
 
