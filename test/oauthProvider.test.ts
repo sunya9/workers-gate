@@ -90,6 +90,18 @@ describe("oauthProvider", () => {
     });
   });
 
+  it("returns null when the token endpoint answers non-JSON", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("access_token=tok&token_type=bearer", { status: 200 })),
+    );
+    const data = await makeProvider().identify({
+      code: "c1",
+      redirectUri: "https://app.example/auth/callback",
+    });
+    expect(data).toBeNull();
+  });
+
   it("returns null when the token exchange fails", async () => {
     vi.stubGlobal(
       "fetch",

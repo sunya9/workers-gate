@@ -7,6 +7,25 @@ function futureExp() {
   return Math.floor(Date.now() / 1000) + 600;
 }
 
+describe("audience binding", () => {
+  it("round-trips when the audience matches", async () => {
+    const token = await sign({ exp: futureExp() }, SECRET, "https://app.example");
+    const result = await verify(token, SECRET, "https://app.example");
+    expect(result).not.toBeNull();
+    expect(result!.payload).toMatchObject({ aud: "https://app.example" });
+  });
+
+  it("returns null for a token issued for another audience", async () => {
+    const token = await sign({ exp: futureExp() }, SECRET, "https://other.example");
+    expect(await verify(token, SECRET, "https://app.example")).toBeNull();
+  });
+
+  it("returns null for a token without aud when an audience is required", async () => {
+    const token = await sign({ exp: futureExp() }, SECRET);
+    expect(await verify(token, SECRET, "https://app.example")).toBeNull();
+  });
+});
+
 describe("sign / verify", () => {
   it("round-trips a signed payload", async () => {
     const token = await sign({ exp: futureExp(), returnTo: "/foo" }, SECRET);

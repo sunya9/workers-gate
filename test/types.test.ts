@@ -9,7 +9,7 @@ describe("type-level behavior", () => {
       identify: async () => ({ ids: [] }),
     };
     createGate({
-      cookieSecret: "s",
+      cookieSecret: "0123456789abcdef0123456789abcdef",
       provider: guildProvider,
       filter: (data) => {
         expectTypeOf(data).toEqualTypeOf<{ ids: string[] }>();
@@ -27,7 +27,7 @@ describe("type-level behavior", () => {
 
   it("createGate returns a plain (request) => Promise<Response | null>", () => {
     const gate = createGate({
-      cookieSecret: "s",
+      cookieSecret: "0123456789abcdef0123456789abcdef",
       provider: {
         authorizeUrl: () => "https://idp.example/authorize",
         identify: async () => ({}),

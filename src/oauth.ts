@@ -66,7 +66,13 @@ export function oauthProvider<Data extends {}>(
         }).toString(),
       });
       if (!res.ok) return null;
-      const data: unknown = await res.json();
+      // a token endpoint answering non-JSON is out of contract: fail closed
+      let data: unknown;
+      try {
+        data = await res.json();
+      } catch {
+        return null;
+      }
       if (
         typeof data !== "object" ||
         data === null ||

@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { sign } from "../src/cookie";
+import { sign, verify } from "../src/cookie";
 import { createGate, type GateConfig, type GateProvider } from "../src/index";
 
-const SECRET = "cookie-secret";
+const SECRET = "test-cookie-secret-0123456789abcdef";
+const ORIGIN = "https://app.example";
 
 type TeamData = { team: string };
 
@@ -34,7 +35,7 @@ function nowSec() {
 }
 
 async function stateCookie(state = "st1", returnTo = "/secret") {
-  const token = await sign({ state, returnTo, exp: nowSec() + 600 }, SECRET);
+  const token = await sign({ state, returnTo, exp: nowSec() + 600 }, SECRET, ORIGIN);
   return `__gate_state=${token}`;
 }
 
@@ -203,13 +204,13 @@ describe("filter", () => {
 
 describe("session", () => {
   it("returns null for requests with a valid session cookie", async () => {
-    const token = await sign({ exp: nowSec() + 3600 }, SECRET);
+    const token = await sign({ exp: nowSec() + 3600 }, SECRET, ORIGIN);
     const res = await makeGate()(docRequest("/secret", { Cookie: `__gate=${token}` }));
     expect(res).toBeNull();
   });
 
   it("sends expired sessions to silent re-authorization", async () => {
-    const token = await sign({ exp: nowSec() - 10 }, SECRET);
+    const token = await sign({ exp: nowSec() - 10 }, SECRET, ORIGIN);
     const res = await makeGate()(docRequest("/secret", { Cookie: `__gate=${token}` }));
     expect(res!.status).toBe(302);
     const location = new URL(res!.headers.get("Location")!, "https://app.example");
@@ -230,6 +231,89 @@ describe("configuration", () => {
   it("throws immediately when cookieSecret is empty", () => {
     expect(() => makeGate({ cookieSecret: "" })).toThrow(/cookieSecret/);
   });
+
+  it("throws on a cookieSecret shorter than 32 characters", () => {
+    expect(() => makeGate({ cookieSecret: "short-secret" })).toThrow(/32 characters/);
+  });
+});
+
+describe("session hardening", () => {
+  it("rejects session cookies issued for a different origin", async () => {
+    const token = await sign({ exp: nowSec() + 3600 }, SECRET, "https://other.example");
+    const res = await makeGate()(docRequest("/secret", { Cookie: `__gate=${token}` }));
+    expect(res!.status).toBe(302);
+    const location = new URL(res!.headers.get("Location")!, ORIGIN);
+    expect(location.pathname).toBe("/auth/login");
+    // wrong audience is untrusted entirely — no silent re-auth shortcut
+    expect(location.searchParams.get("silent")).toBeNull();
+  });
+
+  it("stamps the session with aud and sessionVersion on issue", async () => {
+    const res = await makeGate({ sessionVersion: 3 })(
+      docRequest("/auth/callback?code=good&state=st1", {
+        Cookie: await stateCookie(),
+      }),
+    );
+    const token = (res!.headers.get("Set-Cookie") ?? "").match(/__gate=([^;]+)/)![1]!;
+    const verified = await verify(token, SECRET, ORIGIN);
+    expect(verified).not.toBeNull();
+    expect(verified!.payload).toMatchObject({ v: 3, aud: ORIGIN });
+  });
+
+  it("admits sessions carrying the current sessionVersion", async () => {
+    const token = await sign({ exp: nowSec() + 3600, v: "2024-policy" }, SECRET, ORIGIN);
+    const res = await makeGate({ sessionVersion: "2024-policy" })(
+      docRequest("/secret", { Cookie: `__gate=${token}` }),
+    );
+    expect(res).toBeNull();
+  });
+
+  it("sends stale-version sessions back through silent re-authorization", async () => {
+    const token = await sign({ exp: nowSec() + 3600, v: 1 }, SECRET, ORIGIN);
+    const res = await makeGate({ sessionVersion: 2 })(
+      docRequest("/secret", { Cookie: `__gate=${token}` }),
+    );
+    expect(res!.status).toBe(302);
+    const location = new URL(res!.headers.get("Location")!, ORIGIN);
+    expect(location.searchParams.get("silent")).toBe("1");
+  });
+});
+
+describe("fail-closed on exceptions", () => {
+  it("denies with 403 when identify throws", async () => {
+    const identify = vi.fn(async (): Promise<TeamData | null> => {
+      throw new Error("IdP is down");
+    });
+    const res = await makeGate({ provider: fakeProvider({ identify }) })(
+      docRequest("/auth/callback?code=good&state=st1", {
+        Cookie: await stateCookie(),
+      }),
+    );
+    expect(res!.status).toBe(403);
+  });
+
+  it("denies with 403 when filter throws", async () => {
+    const res = await makeGate({
+      filter: () => {
+        throw new Error("policy bug");
+      },
+    })(
+      docRequest("/auth/callback?code=good&state=st1", {
+        Cookie: await stateCookie(),
+      }),
+    );
+    expect(res!.status).toBe(403);
+  });
+});
+
+describe("__Host- cookies", () => {
+  it("widens the state cookie path to / when the name is __Host- prefixed", async () => {
+    const res = await makeGate({ stateCookieName: "__Host-gate_state" })(docRequest("/auth/login"));
+    const setCookie = res!.headers.get("Set-Cookie") ?? "";
+    expect(setCookie).toContain("__Host-gate_state=");
+    expect(setCookie).toContain("Path=/;");
+    expect(setCookie).not.toContain("Path=/auth/callback");
+  });
 });
 
 describe("custom responses", () => {
@@ -247,7 +331,7 @@ describe("custom responses", () => {
   });
 
   it("bypasses the signin hook for silent re-authorization of expired sessions", async () => {
-    const token = await sign({ exp: nowSec() - 10 }, SECRET);
+    const token = await sign({ exp: nowSec() - 10 }, SECRET, ORIGIN);
     const res = await makeGate({
       signin: () => new Response("should not appear", { status: 401 }),
     })(docRequest("/secret", { Cookie: `__gate=${token}` }));

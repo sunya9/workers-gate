@@ -61,6 +61,12 @@ export interface GateConfig<Data extends {} = {}> {
    * which stays a seamless redirect. loginUrl carries the returnTo.
    */
   signin?: (context: { request: Request; loginUrl: string }) => Response | Promise<Response>;
+  /**
+   * Stamped into every session; sessions carrying a different value are sent
+   * back through (silent) re-authorization. Bump it to invalidate all
+   * outstanding sessions at once — the stateless substitute for revocation.
+   */
+  sessionVersion?: string | number;
   loginPath?: string;
   callbackPath?: string;
   logoutPath?: string;
@@ -77,6 +83,7 @@ export type Gate = (request: Request) => Promise<Response | null>;
 
 interface SessionPayload {
   exp: number;
+  v?: string | number;
 }
 
 interface StatePayload {
@@ -133,6 +140,7 @@ export function createGate<Data extends {}>(config: GateConfig<Data>): Gate {
     denied,
     unauthorized,
     signin,
+    sessionVersion,
     loginPath = "/auth/login",
     callbackPath = "/auth/callback",
     logoutPath = "/auth/logout",
@@ -141,9 +149,15 @@ export function createGate<Data extends {}>(config: GateConfig<Data>): Gate {
     stateCookieName = "__gate_state",
   } = config;
 
-  if (!cookieSecret) {
-    throw new TypeError("createGate: cookieSecret is empty");
+  if (cookieSecret.length < 32) {
+    throw new TypeError(
+      "createGate: cookieSecret must be at least 32 characters (e.g. openssl rand -hex 32)",
+    );
   }
+
+  // __Host- prefixed cookies require Path=/; otherwise keep the state
+  // cookie scoped to the callback route only
+  const stateCookiePath = stateCookieName.startsWith("__Host-") ? "/" : callbackPath;
 
   return async function gate(request: Request): Promise<Response | null> {
     const url = new URL(request.url);
@@ -167,18 +181,19 @@ export function createGate<Data extends {}>(config: GateConfig<Data>): Gate {
       const stateToken = await sign(
         { state, returnTo, exp: nowSec() + 600 } satisfies StatePayload,
         cookieSecret,
+        url.origin,
       );
       const res = redirect(provider.authorizeUrl({ redirectUri, state, silent }));
       res.headers.set(
         "Set-Cookie",
-        `${stateCookieName}=${stateToken}; Path=${callbackPath}; HttpOnly; Secure; SameSite=Lax; Max-Age=600`,
+        `${stateCookieName}=${stateToken}; Path=${stateCookiePath}; HttpOnly; Secure; SameSite=Lax; Max-Age=600`,
       );
       return res;
     };
 
     const handleCallback = async (): Promise<Response> => {
       const stateToken = readCookie(stateCookieName);
-      const verified = stateToken ? await verify(stateToken, cookieSecret) : null;
+      const verified = stateToken ? await verify(stateToken, cookieSecret, url.origin) : null;
       const statePayload =
         verified && !verified.expired && isStatePayload(verified.payload) ? verified.payload : null;
 
@@ -195,9 +210,24 @@ export function createGate<Data extends {}>(config: GateConfig<Data>): Gate {
         return new Response("Invalid OAuth state", { status: 400 });
       }
 
-      const data = await provider.identify({ code, redirectUri });
+      // exceptions fail closed: an IdP outage or a filter bug must deny,
+      // never crash into the platform error page; keep the cause in logs
+      let data: Data | null;
+      try {
+        data = await provider.identify({ code, redirectUri });
+      } catch (error) {
+        console.error("workers-gate: provider.identify threw", error);
+        data = null;
+      }
       // loose != so a sloppy provider resolving undefined fails closed
-      const allowed = data != null && (filter ? await filter(data, { request }) : true);
+      let allowed = false;
+      if (data != null) {
+        try {
+          allowed = filter ? await filter(data, { request }) : true;
+        } catch (error) {
+          console.error("workers-gate: filter threw", error);
+        }
+      }
       if (!allowed) {
         const retryUrl = `${loginPath}?returnTo=${encodeURIComponent(
           safeReturnTo(statePayload.returnTo),
@@ -210,8 +240,12 @@ export function createGate<Data extends {}>(config: GateConfig<Data>): Gate {
       }
 
       const session = await sign(
-        { exp: nowSec() + sessionTtlSeconds } satisfies SessionPayload,
+        {
+          exp: nowSec() + sessionTtlSeconds,
+          ...(sessionVersion !== undefined ? { v: sessionVersion } : {}),
+        } satisfies SessionPayload,
         cookieSecret,
+        url.origin,
       );
       const res = redirect(safeReturnTo(statePayload.returnTo));
       res.headers.append(
@@ -220,7 +254,7 @@ export function createGate<Data extends {}>(config: GateConfig<Data>): Gate {
       );
       res.headers.append(
         "Set-Cookie",
-        `${stateCookieName}=; Path=${callbackPath}; HttpOnly; Secure; SameSite=Lax; Max-Age=0`,
+        `${stateCookieName}=; Path=${stateCookiePath}; HttpOnly; Secure; SameSite=Lax; Max-Age=0`,
       );
       return res;
     };
@@ -244,9 +278,12 @@ export function createGate<Data extends {}>(config: GateConfig<Data>): Gate {
     }
 
     const sessionToken = readCookie(cookieName);
-    const verified = sessionToken ? await verify(sessionToken, cookieSecret) : null;
+    const verified = sessionToken ? await verify(sessionToken, cookieSecret, url.origin) : null;
     const session = verified && isSessionPayload(verified.payload) ? verified.payload : null;
-    if (session && !verified?.expired) {
+    // a stale sessionVersion is treated like expiry: the visitor is real,
+    // but the policy changed — send them back through re-authorization
+    const versionOk = sessionVersion === undefined || session?.v === sessionVersion;
+    if (session && !verified?.expired && versionOk) {
       return null; // authorized — the request is yours
     }
 
