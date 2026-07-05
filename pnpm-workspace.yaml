@@ -1,2 +1,8 @@
 packages:
   - examples/*
+
+# dependency build scripts allowed to run (pnpm blocks the rest)
+allowBuilds:
+  esbuild: true
+  sharp: true
+  workerd: true
