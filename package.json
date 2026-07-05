@@ -9,7 +9,12 @@
     "oauth2",
     "stateless"
   ],
+  "homepage": "https://github.com/sunya9/workers-gate#readme",
+  "bugs": {
+    "url": "https://github.com/sunya9/workers-gate/issues"
+  },
   "license": "MIT",
+  "author": "sunya (https://unsweets.net/)",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/sunya9/workers-gate.git"
@@ -18,11 +23,17 @@
     "dist"
   ],
   "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -43,5 +54,6 @@
     "oxlint": "^1.72.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9"
-  }
+  },
+  "packageManager": "pnpm@11.9.0"
 }
