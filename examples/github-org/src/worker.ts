@@ -15,16 +15,13 @@ const gate = createGate({
     // back anyway, so silent re-authorization needs no extra params.
     async identify({ accessToken }) {
       // 404 = not a member (or membership hidden from this token)
-      const res = await fetch(
-        `https://api.github.com/user/memberships/orgs/${env.GITHUB_ORG}`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            Accept: "application/vnd.github+json",
-            "User-Agent": "workers-gate-example", // GitHub API rejects UA-less requests
-          },
+      const res = await fetch(`https://api.github.com/user/memberships/orgs/${env.GITHUB_ORG}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: "application/vnd.github+json",
+          "User-Agent": "workers-gate-example", // GitHub API rejects UA-less requests
         },
-      );
+      });
       if (!res.ok) return null;
       const membership: { state: string; role: string } = await res.json();
       return membership;

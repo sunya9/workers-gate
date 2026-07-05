@@ -42,37 +42,25 @@ export interface GateConfig<Data extends {} = {}> {
    * decide whether to let the visitor in. Runs on every (re-)login.
    * Omitted = anyone the provider can identify is admitted.
    */
-  filter?: (
-    data: Data,
-    context: GateFilterContext,
-  ) => boolean | Promise<boolean>;
+  filter?: (data: Data, context: GateFilterContext) => boolean | Promise<boolean>;
   /**
    * Custom 403 response for visitors the provider couldn't identify or the
    * filter rejected. Default: a minimal built-in HTML page.
    * loginUrl carries the returnTo, so a retry lands on the original page.
    */
-  denied?: (context: {
-    request: Request;
-    loginUrl: string;
-  }) => Response | Promise<Response>;
+  denied?: (context: { request: Request; loginUrl: string }) => Response | Promise<Response>;
   /**
    * Custom response for non-document requests (fetch/XHR) without a valid
    * session. Default: a plain-text 401. loginUrl carries the returnTo.
    */
-  unauthorized?: (context: {
-    request: Request;
-    loginUrl: string;
-  }) => Response | Promise<Response>;
+  unauthorized?: (context: { request: Request; loginUrl: string }) => Response | Promise<Response>;
   /**
    * Custom sign-in screen for unauthenticated document requests.
    * Default: redirect straight to the provider's authorize URL.
    * Not consulted for silent re-authorization of expired sessions,
    * which stays a seamless redirect. loginUrl carries the returnTo.
    */
-  signin?: (context: {
-    request: Request;
-    loginUrl: string;
-  }) => Response | Promise<Response>;
+  signin?: (context: { request: Request; loginUrl: string }) => Response | Promise<Response>;
   loginPath?: string;
   callbackPath?: string;
   logoutPath?: string;
@@ -120,10 +108,7 @@ function forbiddenHtml(loginUrl: string): string {
 
 function isSessionPayload(value: unknown): value is SessionPayload {
   return (
-    typeof value === "object" &&
-    value !== null &&
-    "exp" in value &&
-    typeof value.exp === "number"
+    typeof value === "object" && value !== null && "exp" in value && typeof value.exp === "number"
   );
 }
 
@@ -193,13 +178,9 @@ export function createGate<Data extends {}>(config: GateConfig<Data>): Gate {
 
     const handleCallback = async (): Promise<Response> => {
       const stateToken = readCookie(stateCookieName);
-      const verified = stateToken
-        ? await verify(stateToken, cookieSecret)
-        : null;
+      const verified = stateToken ? await verify(stateToken, cookieSecret) : null;
       const statePayload =
-        verified && !verified.expired && isStatePayload(verified.payload)
-          ? verified.payload
-          : null;
+        verified && !verified.expired && isStatePayload(verified.payload) ? verified.payload : null;
 
       // providers report failed silent re-auth as an error param;
       // fall back to interactive login instead of surfacing it
@@ -216,8 +197,7 @@ export function createGate<Data extends {}>(config: GateConfig<Data>): Gate {
 
       const data = await provider.identify({ code, redirectUri });
       // loose != so a sloppy provider resolving undefined fails closed
-      const allowed =
-        data != null && (filter ? await filter(data, { request }) : true);
+      const allowed = data != null && (filter ? await filter(data, { request }) : true);
       if (!allowed) {
         const retryUrl = `${loginPath}?returnTo=${encodeURIComponent(
           safeReturnTo(statePayload.returnTo),
@@ -264,11 +244,8 @@ export function createGate<Data extends {}>(config: GateConfig<Data>): Gate {
     }
 
     const sessionToken = readCookie(cookieName);
-    const verified = sessionToken
-      ? await verify(sessionToken, cookieSecret)
-      : null;
-    const session =
-      verified && isSessionPayload(verified.payload) ? verified.payload : null;
+    const verified = sessionToken ? await verify(sessionToken, cookieSecret) : null;
+    const session = verified && isSessionPayload(verified.payload) ? verified.payload : null;
     if (session && !verified?.expired) {
       return null; // authorized — the request is yours
     }

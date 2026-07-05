@@ -7,12 +7,12 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "run_worker_first": true
+    "run_worker_first": true,
   },
   "vars": {
     // Discord server ID to admit (developer mode → right-click server → Copy Server ID)
-    "GUILD_ID": "000000000000000000"
-  }
+    "GUILD_ID": "000000000000000000",
+  },
   // Secrets (wrangler secret put / .dev.vars):
   //   DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, COOKIE_SECRET
 }

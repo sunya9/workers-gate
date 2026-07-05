@@ -9,15 +9,10 @@ export interface VerifiedToken {
 }
 
 export function sign(payload: JWTPayload, secret: string): Promise<string> {
-  return new SignJWT(payload)
-    .setProtectedHeader({ alg: "HS256" })
-    .sign(encoder.encode(secret));
+  return new SignJWT(payload).setProtectedHeader({ alg: "HS256" }).sign(encoder.encode(secret));
 }
 
-export async function verify(
-  token: string,
-  secret: string,
-): Promise<VerifiedToken | null> {
+export async function verify(token: string, secret: string): Promise<VerifiedToken | null> {
   try {
     const { payload } = await jwtVerify(token, encoder.encode(secret), {
       algorithms: ["HS256"],

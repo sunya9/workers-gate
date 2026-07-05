@@ -18,9 +18,7 @@ describe("sign / verify", () => {
 
   it("produces standard three-part JWTs with cookie-safe characters", async () => {
     const token = await sign({ exp: futureExp() }, SECRET);
-    expect(token).toMatch(
-      /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/,
-    );
+    expect(token).toMatch(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
   });
 
   it("returns null for a tampered payload", async () => {
@@ -45,10 +43,7 @@ describe("sign / verify", () => {
   });
 
   it("reports expired-but-validly-signed tokens with their payload", async () => {
-    const token = await sign(
-      { exp: Math.floor(Date.now() / 1000) - 10, returnTo: "/x" },
-      SECRET,
-    );
+    const token = await sign({ exp: Math.floor(Date.now() / 1000) - 10, returnTo: "/x" }, SECRET);
     const result = await verify(token, SECRET);
     expect(result).not.toBeNull();
     expect(result!.expired).toBe(true);

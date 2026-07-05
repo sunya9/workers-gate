@@ -1,23 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { sign } from "../src/cookie";
-import {
-  createGate,
-  type GateConfig,
-  type GateProvider,
-} from "../src/index";
+import { createGate, type GateConfig, type GateProvider } from "../src/index";
 
 const SECRET = "cookie-secret";
 
 type TeamData = { team: string };
 
-function fakeProvider(
-  overrides: Partial<GateProvider<TeamData>> = {},
-): GateProvider<TeamData> {
+function fakeProvider(overrides: Partial<GateProvider<TeamData>> = {}): GateProvider<TeamData> {
   return {
     authorizeUrl: ({ state, silent }) =>
       `https://idp.example/authorize?state=${state}${silent ? "&silent=1" : ""}`,
-    identify: async ({ code }) =>
-      code === "good" ? { team: "blue" } : null,
+    identify: async ({ code }) => (code === "good" ? { team: "blue" } : null),
     ...overrides,
   };
 }
@@ -50,10 +43,7 @@ describe("unauthorized access", () => {
     const res = await makeGate()(docRequest("/secret/page?x=1"));
     expect(res).not.toBeNull();
     expect(res!.status).toBe(302);
-    const location = new URL(
-      res!.headers.get("Location")!,
-      "https://app.example",
-    );
+    const location = new URL(res!.headers.get("Location")!, "https://app.example");
     expect(location.pathname).toBe("/auth/login");
     expect(location.searchParams.get("returnTo")).toBe("/secret/page?x=1");
   });
@@ -91,9 +81,7 @@ describe("login start", () => {
   });
 
   it("ignores external returnTo URLs", async () => {
-    const res = await makeGate()(
-      docRequest("/auth/login?returnTo=https%3A%2F%2Fevil.example%2F"),
-    );
+    const res = await makeGate()(docRequest("/auth/login?returnTo=https%3A%2F%2Fevil.example%2F"));
     expect(res!.status).toBe(302);
     expect(res!.headers.get("Set-Cookie") ?? "").not.toContain("evil.example");
   });
@@ -161,9 +149,7 @@ describe("callback", () => {
   });
 
   it("returns 400 when the state cookie is missing", async () => {
-    const res = await makeGate()(
-      docRequest("/auth/callback?code=good&state=st1"),
-    );
+    const res = await makeGate()(docRequest("/auth/callback?code=good&state=st1"));
     expect(res!.status).toBe(400);
   });
 
@@ -174,10 +160,7 @@ describe("callback", () => {
       }),
     );
     expect(res!.status).toBe(302);
-    const location = new URL(
-      res!.headers.get("Location")!,
-      "https://app.example",
-    );
+    const location = new URL(res!.headers.get("Location")!, "https://app.example");
     expect(location.pathname).toBe("/auth/login");
   });
 });
@@ -221,22 +204,15 @@ describe("filter", () => {
 describe("session", () => {
   it("returns null for requests with a valid session cookie", async () => {
     const token = await sign({ exp: nowSec() + 3600 }, SECRET);
-    const res = await makeGate()(
-      docRequest("/secret", { Cookie: `__gate=${token}` }),
-    );
+    const res = await makeGate()(docRequest("/secret", { Cookie: `__gate=${token}` }));
     expect(res).toBeNull();
   });
 
   it("sends expired sessions to silent re-authorization", async () => {
     const token = await sign({ exp: nowSec() - 10 }, SECRET);
-    const res = await makeGate()(
-      docRequest("/secret", { Cookie: `__gate=${token}` }),
-    );
+    const res = await makeGate()(docRequest("/secret", { Cookie: `__gate=${token}` }));
     expect(res!.status).toBe(302);
-    const location = new URL(
-      res!.headers.get("Location")!,
-      "https://app.example",
-    );
+    const location = new URL(res!.headers.get("Location")!, "https://app.example");
     expect(location.pathname).toBe("/auth/login");
     expect(location.searchParams.get("silent")).toBe("1");
   });
@@ -276,10 +252,7 @@ describe("custom responses", () => {
       signin: () => new Response("should not appear", { status: 401 }),
     })(docRequest("/secret", { Cookie: `__gate=${token}` }));
     expect(res!.status).toBe(302);
-    const location = new URL(
-      res!.headers.get("Location")!,
-      "https://app.example",
-    );
+    const location = new URL(res!.headers.get("Location")!, "https://app.example");
     expect(location.searchParams.get("silent")).toBe("1");
   });
 

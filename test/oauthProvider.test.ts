@@ -26,14 +26,10 @@ describe("oauthProvider", () => {
         silent: false,
       }),
     );
-    expect(url.origin + url.pathname).toBe(
-      "https://idp.example/oauth/authorize",
-    );
+    expect(url.origin + url.pathname).toBe("https://idp.example/oauth/authorize");
     expect(url.searchParams.get("client_id")).toBe("my-client");
     expect(url.searchParams.get("response_type")).toBe("code");
-    expect(url.searchParams.get("redirect_uri")).toBe(
-      "https://app.example/auth/callback",
-    );
+    expect(url.searchParams.get("redirect_uri")).toBe("https://app.example/auth/callback");
     expect(url.searchParams.get("scope")).toBe("read:things");
     expect(url.searchParams.get("state")).toBe("st1");
     expect(url.searchParams.get("prompt")).toBeNull();
@@ -60,16 +56,11 @@ describe("oauthProvider", () => {
     });
 
     expect(data).toEqual({ token: "tok" });
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [
-      string,
-      RequestInit,
-    ];
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://idp.example/oauth/token");
     expect(init.method).toBe("POST");
     // GitHub-style token endpoints answer form-urlencoded without this
-    expect((init.headers as Record<string, string>).Accept).toBe(
-      "application/json",
-    );
+    expect((init.headers as Record<string, string>).Accept).toBe("application/json");
     const body = new URLSearchParams(init.body as string);
     expect(body.get("grant_type")).toBe("authorization_code");
     expect(body.get("code")).toBe("c1");
@@ -81,9 +72,7 @@ describe("oauthProvider", () => {
   it("hands identify the whole token response for id_token-style extras", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        Response.json({ access_token: "tok", id_token: "jwt-here", scope: "s" }),
-      ),
+      vi.fn(async () => Response.json({ access_token: "tok", id_token: "jwt-here", scope: "s" })),
     );
     const provider = oauthProvider({
       authorizeEndpoint: "https://idp.example/oauth/authorize",

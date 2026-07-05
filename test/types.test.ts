@@ -20,9 +20,9 @@ describe("type-level behavior", () => {
 
   it("rejects nullish Data at the type level — identify must return Data | null", () => {
     // @ts-expect-error Data must be non-nullish
-    type BadUndefined = GateProvider<undefined>;
+    type _BadUndefined = GateProvider<undefined>;
     // @ts-expect-error Data must be non-nullish
-    type BadNull = GateProvider<null>;
+    type _BadNull = GateProvider<null>;
   });
 
   it("createGate returns a plain (request) => Promise<Response | null>", () => {
@@ -34,8 +34,6 @@ describe("type-level behavior", () => {
       },
     });
     expectTypeOf(gate).toEqualTypeOf<Gate>();
-    expectTypeOf(gate).toEqualTypeOf<
-      (request: Request) => Promise<Response | null>
-    >();
+    expectTypeOf(gate).toEqualTypeOf<(request: Request) => Promise<Response | null>>();
   });
 });

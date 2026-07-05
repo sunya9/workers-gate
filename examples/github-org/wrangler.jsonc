@@ -7,12 +7,12 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "run_worker_first": true
+    "run_worker_first": true,
   },
   "vars": {
     // GitHub organization login (the slug in github.com/<org>)
-    "GITHUB_ORG": "your-org"
-  }
+    "GITHUB_ORG": "your-org",
+  },
   // Secrets (wrangler secret put / .dev.vars) — set them BEFORE the first deploy:
   //   GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, COOKIE_SECRET
 }
