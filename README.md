@@ -89,9 +89,7 @@ const myProvider: GateProvider<MyData> = {
   },
   // Procure the data about the visitor. null = could not identify.
   async identify({ code, redirectUri }) {
-    return {
-      /* whatever your filter needs */
-    };
+    return {/* whatever your filter needs */};
   },
 };
 ```
