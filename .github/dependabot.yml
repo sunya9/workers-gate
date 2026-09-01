@@ -5,7 +5,9 @@ updates:
     schedule:
       interval: "weekly"
     commit-message:
-      prefix: "chore"
+      # "fix" makes release-please cut a patch release for runtime deps
+      prefix: "fix"
+      prefix-development: "chore"
       include: "scope"
     groups:
       dev-dependencies:
