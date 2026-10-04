@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { oauthProvider } from "../src/index";
+import { oauthProvider, type OAuthProviderConfig } from "../src/index";
 
-function makeProvider() {
+function makeProvider(overrides: Partial<OAuthProviderConfig<{ token: string }>> = {}) {
   return oauthProvider({
     authorizeEndpoint: "https://idp.example/oauth/authorize",
     tokenEndpoint: "https://idp.example/oauth/token",
@@ -10,6 +10,7 @@ function makeProvider() {
     scope: "read:things",
     silentParams: { prompt: "none" },
     identify: async ({ accessToken }) => ({ token: accessToken }),
+    ...overrides,
   });
 }
 
@@ -44,6 +45,37 @@ describe("oauthProvider", () => {
       }),
     );
     expect(url.searchParams.get("prompt")).toBe("none");
+  });
+
+  it("appends authorizeParams to every authorize URL", () => {
+    const provider = makeProvider({ authorizeParams: { access_type: "offline" } });
+    for (const silent of [false, true]) {
+      const url = new URL(
+        provider.authorizeUrl({
+          redirectUri: "https://app.example/auth/callback",
+          state: "st1",
+          silent,
+        }),
+      );
+      expect(url.searchParams.get("access_type")).toBe("offline");
+    }
+  });
+
+  it("lets silentParams override authorizeParams for silent re-authorization", () => {
+    const provider = makeProvider({
+      authorizeParams: { prompt: "consent" },
+      silentParams: { prompt: "none" },
+    });
+    const promptFor = (silent: boolean) =>
+      new URL(
+        provider.authorizeUrl({
+          redirectUri: "https://app.example/auth/callback",
+          state: "st1",
+          silent,
+        }),
+      ).searchParams.get("prompt");
+    expect(promptFor(false)).toBe("consent");
+    expect(promptFor(true)).toBe("none");
   });
 
   it("exchanges the code and hands the access token to identify", async () => {

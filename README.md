@@ -98,6 +98,8 @@ The contract: `authorizeUrl` must request whatever scope/claims `identify` needs
 
 `silent` is `true` when a returning visitor's session just expired; OAuth-style providers can translate it to `prompt=none`. If the IdP answers the callback with an `error` param, the gate automatically retries an interactive login. `oauthProvider`'s `identify` also receives the full `tokenResponse` for extras like `id_token`.
 
+`oauthProvider` takes two param bags: `authorizeParams` goes on every authorize URL; `silentParams` only on silent re-authorization and wins on conflicts. Which one `prompt=none` belongs in depends on how the IdP reads it. If it means "skip the consent screen when already authorized" and first-timers still get the screen (Discord, for one), put it in `authorizeParams`. If it means "never interact" and not-yet-authorized users get an `error` back (OIDC proper), put it in `silentParams` so first logins stay interactive.
+
 ## Recipes
 
 The library ships no IdP presets — endpoints, scope, and policy are yours. Both example projects are deployable as-is (wrangler config, `.dev.vars` template, generated types).
@@ -111,7 +113,8 @@ provider: oauthProvider({
   clientId: env.DISCORD_CLIENT_ID,
   clientSecret: env.DISCORD_CLIENT_SECRET,
   scope: "guilds.members.read",
-  silentParams: { prompt: "none" },
+  // Discord's prompt=none only skips consent for already-authorized users
+  authorizeParams: { prompt: "none" },
   async identify({ accessToken }) {
     // membership in this one guild, straight from Discord; 404 = not a member
     const res = await fetch(

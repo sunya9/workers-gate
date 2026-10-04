@@ -16,7 +16,9 @@ export interface OAuthProviderConfig<Data extends {}> {
   clientSecret: string;
   /** Must cover whatever identify() fetches — scope and identify are a pair */
   scope?: string;
-  /** Extra query params appended on silent re-authorization, e.g. { prompt: "none" } */
+  /** Extra query params appended to every authorize URL, e.g. { access_type: "offline" } */
+  authorizeParams?: Record<string, string>;
+  /** Extra query params appended only on silent re-authorization; they win over authorizeParams */
   silentParams?: Record<string, string>;
   /** Fetch the data about the visitor that the gate's filter will judge */
   identify(input: OAuthIdentifyInput): Promise<Data | null>;
@@ -41,11 +43,13 @@ export function oauthProvider<Data extends {}>(
       url.searchParams.set("redirect_uri", redirectUri);
       if (config.scope) url.searchParams.set("scope", config.scope);
       url.searchParams.set("state", state);
-      if (silent) {
-        for (const [key, value] of Object.entries(config.silentParams ?? {})) {
+      const apply = (params: Record<string, string> = {}) => {
+        for (const [key, value] of Object.entries(params)) {
           url.searchParams.set(key, value);
         }
-      }
+      };
+      apply(config.authorizeParams);
+      if (silent) apply(config.silentParams);
       return url.toString();
     },
 

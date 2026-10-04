@@ -10,7 +10,9 @@ const gate = createGate({
     clientId: env.DISCORD_CLIENT_ID,
     clientSecret: env.DISCORD_CLIENT_SECRET,
     scope: "guilds.members.read", // exactly what identify() needs — never asks who the user is
-    silentParams: { prompt: "none" },
+    // Discord's prompt=none only skips the consent screen for already-authorized
+    // users; first-timers still see it, so it is safe on every login
+    authorizeParams: { prompt: "none" },
     async identify({ accessToken }) {
       // asks Discord for our membership in this one guild;
       // 404 = not a member, so the judgment is folded into identify
