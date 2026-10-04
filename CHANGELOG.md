@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/sunya9/workers-gate/compare/v0.2.1...v0.3.0) (2026-10-04)
+
+
+### Features
+
+* **oauth:** add authorizeParams for params sent on every authorize URL ([#28](https://github.com/sunya9/workers-gate/issues/28)) ([c958c4e](https://github.com/sunya9/workers-gate/commit/c958c4ee2f3a0b813222aee7e45d9361f3486a21))
+
 ## [0.2.1](https://github.com/sunya9/workers-gate/compare/v0.2.0...v0.2.1) (2026-09-14)
 
 
