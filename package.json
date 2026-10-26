@@ -1,6 +1,6 @@
 {
   "name": "workers-gate",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Stateless authorization gate for apps on Cloudflare Workers — bring your own provider, no database, cookie signing delegated to jose",
   "keywords": [
     "authorization",
@@ -50,7 +50,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
-    "oxfmt": "^0.74.0",
+    "oxfmt": "^0.73.0",
     "oxlint": "^1.72.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
