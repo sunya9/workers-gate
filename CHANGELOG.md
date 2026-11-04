@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/sunya9/workers-gate/compare/v0.3.0...v0.3.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* **deps:** Bump jose from 6.2.12 to 6.2.13 ([#34](https://github.com/sunya9/workers-gate/issues/34)) ([7669981](https://github.com/sunya9/workers-gate/commit/766998131b780b9e63ad2e9b3fa9e0bcfc7e38d0))
+* **deps:** Bump jose from 6.2.13 to 6.2.14 ([#37](https://github.com/sunya9/workers-gate/issues/37)) ([6d7542a](https://github.com/sunya9/workers-gate/commit/6d7542a1d2909fed712e5b637171959633fdea50))
+
 ## [0.3.0](https://github.com/sunya9/workers-gate/compare/v0.2.1...v0.3.0) (2026-10-04)
 
 
