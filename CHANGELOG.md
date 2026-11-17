@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.3](https://github.com/sunya9/workers-gate/compare/v0.3.2...v0.3.3) (2026-11-17)
+
+
+### Bug Fixes
+
+* **deps:** Bump jose from 6.2.15 to 6.2.17 ([#45](https://github.com/sunya9/workers-gate/issues/45)) ([0042499](https://github.com/sunya9/workers-gate/commit/00424997306b0cf9025d90853450191ddceea1b4))
+* **deps:** remove duplicate tslib entry in pnpm-lock.yaml ([7496b9b](https://github.com/sunya9/workers-gate/commit/7496b9b324aa4751c30cc045d0bf8b3971c7b5b3))
+
 ## [0.3.2](https://github.com/sunya9/workers-gate/compare/v0.3.1...v0.3.2) (2026-11-10)
 
 
